@@ -1,0 +1,123 @@
+import re
+
+variables = {}
+
+def interpret():
+    print("Enter your values (press Enter twice to finish):")
+    program = ""
+    while True:
+        line = input()
+        if line == "":
+            break
+        program += line + "\n"
+
+    lines = program.split(';')  
+
+    for line in lines:
+        line = line.strip()  
+
+        if line:
+            assignment = re.match(r'^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)$', line)
+
+            if not assignment:
+                print(f"Syntax error: Invalid assignment: {line}")
+                return
+
+            variable = assignment.group(1)
+            expression = assignment.group(2)
+
+            value = evaluate_expression(expression)
+
+            if value is None:
+                print(f"Error: Uninitialized variables in expression: {expression}")
+                return
+
+            variables[variable] = value
+
+    print("Variable values:")
+    for var, value in variables.items():
+        print(f"{var} = {value}")
+
+def evaluate_expression(expression):
+    tokens = re.findall(r'[+\-*/()]|[a-zA-Z_][a-zA-Z0-9_]*|[0-9]+', expression)
+
+    for token in tokens:
+        if token.isdigit() and len(token) > 1 and token[0] == '0':
+            print(f"Syntax error: Invalid literal: {token}")
+            return None
+
+    output_queue = []
+    operator_stack = []
+    precedence = {'+': 1, '-': 1, '*': 2, '/': 2}
+
+    for token in tokens:
+        if token == '-':
+            while operator_stack and operator_stack[-1] != '(' and precedence[token] <= precedence[operator_stack[-1]]:
+                output_queue.append(operator_stack.pop())
+            operator_stack.append(token)
+        elif token in '+*/':
+            while operator_stack and operator_stack[-1] != '(' and precedence[token] <= precedence[operator_stack[-1]]:
+                output_queue.append(operator_stack.pop())
+            operator_stack.append(token)
+        elif token == '(':
+            operator_stack.append(token)
+        elif token == ')':
+            while operator_stack and operator_stack[-1] != '(':
+                output_queue.append(operator_stack.pop())
+            if operator_stack and operator_stack[-1] == '(':
+                operator_stack.pop()
+            else:
+                print(f"Syntax error: Mismatched parentheses in expression: {expression}")
+                return None
+        else:
+            output_queue.append(token)
+
+    while operator_stack:
+        if operator_stack[-1] == '(':
+            print(f"Syntax error: Mismatched parentheses in expression: {expression}")
+            return None
+        output_queue.append(operator_stack.pop())
+
+    operand_stack = []
+
+    for token in output_queue:
+        if re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', token):  
+            if token in variables:
+                operand_stack.append(variables[token])
+            else:
+                print(f"Error: Uninitialized variables in expression: {expression}")
+                return None
+        elif re.match(r'^[0-9]+$', token):  
+            operand_stack.append(int(token))
+        elif token in '+-*/':  
+            if len(operand_stack) < 2:
+                print(f"Syntax error: Insufficient operands in expression: {expression}")
+                return None
+            right_operand = operand_stack.pop()
+            left_operand = operand_stack.pop()
+            result = perform_operation(token, left_operand, right_operand)
+            if result is None:
+                print(f"Error: Division by zero in expression: {expression}")
+                return None
+            operand_stack.append(result)
+
+    if len(operand_stack) == 1:
+        return operand_stack[0]
+    else:
+        print(f"Syntax error: Invalid expression: {expression}")
+        return None
+
+def perform_operation(operator, left_operand, right_operand):
+    if operator == '+':
+        return left_operand + right_operand
+    elif operator == '-':
+        return left_operand - right_operand
+    elif operator == '*':
+        return left_operand * right_operand
+    elif operator == '/':
+        if right_operand != 0:
+            return left_operand / right_operand
+        else:
+            return None
+
+interpret()
